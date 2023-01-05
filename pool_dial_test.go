@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ONSdigital/graphson"
-	"github.com/pkg/errors"
 )
 
 const reqPrefix = `!application/vnd.gremlin-v3.0+json` // length-prefixed string for content-type: 1st byte is len(rest of this string)

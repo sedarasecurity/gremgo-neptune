@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -53,7 +51,7 @@ func (c *Client) saveWorkerCtx(ctx context.Context, msgChan chan []byte, errs ch
 		select {
 		case msg := <-msgChan:
 			if err := c.handleResponse(msg); err != nil {
-				errs <- errors.Wrapf(err, "saveWorkerCtx: handleResponse error")
+				errs <- fmt.Errorf("saveWorkerCtx: handleResponse error [%w]", err)
 			}
 		case <-ctx.Done():
 			return

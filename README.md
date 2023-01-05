@@ -9,8 +9,7 @@ gremgo is a fast, efficient, and easy-to-use client for the TinkerPop graph data
 Installation
 ==========
 ```
-go get github.com/ONSdigital/gremgo-neptune
-dep ensure
+go get github.com/sedarasecurity/gremgo-neptune
 ```
 
 Development
@@ -24,7 +23,7 @@ go generate
 Documentation
 ==========
 
-* [GoDoc](https://godoc.org/github.com/ONSdigital/gremgo-neptune)
+* [GoDoc](https://godoc.org/github.com/sedarasecurity/gremgo-neptune)
 
 Examples
 

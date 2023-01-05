@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ONSdigital/graphson"
-	"github.com/ONSdigital/gremgo-neptune"
+	"github.com/sedarasecurity/gremgo-neptune"
 )
 
 func main() {

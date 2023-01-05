@@ -2,13 +2,14 @@ package gremgo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/ONSdigital/graphson"
-	"github.com/pkg/errors"
 )
 
 const connRequestQueueSize = 1000000
@@ -120,12 +121,12 @@ func (p *Pool) subtractOpen(opts so, err error) error {
 
 func (p *Pool) openNewConnection() (err error) {
 	if p.closed {
-		return p.subtractOpen(so{}, errors.Errorf("failed to openNewConnection - pool closed"))
+		return p.subtractOpen(so{}, fmt.Errorf("failed to openNewConnection - pool closed"))
 	}
 	var c *Client
 	c, err = p.dial()
 	if err != nil {
-		return p.subtractOpen(so{tryOpening: true}, errors.Wrapf(err, "failed to openNewConnection - dial"))
+		return p.subtractOpen(so{tryOpening: true}, fmt.Errorf("failed to openNewConnection - dial [%w]", err))
 	}
 	cn := &conn{
 		Pool:   p,
@@ -134,7 +135,7 @@ func (p *Pool) openNewConnection() (err error) {
 	}
 	p.mu.Lock()
 	if !p.putConnLocked(cn, nil) {
-		return p.subtractOpen(so{alreadyLocked: true, conn: cn}, errors.Errorf("failed to openNewConnection - connLocked"))
+		return p.subtractOpen(so{alreadyLocked: true, conn: cn}, fmt.Errorf("failed to openNewConnection - connLocked"))
 	}
 	p.mu.Unlock()
 	return
@@ -189,7 +190,7 @@ func (p *Pool) connCtx(ctx context.Context) (*conn, error) {
 	if err == nil {
 		return cn, nil
 	}
-	if errors.Cause(err) == ErrBadConn {
+	if errors.Is(err, ErrBadConn) {
 		return p._conn(ctx, false)
 	}
 	return cn, err
@@ -206,7 +207,7 @@ func (p *Pool) _conn(ctx context.Context, useFreeConn bool) (*conn, error) {
 	default:
 	case <-ctx.Done():
 		p.mu.Unlock()
-		return nil, errors.Wrap(ctx.Err(), "the context is expired")
+		return nil, fmt.Errorf("the context is expired: [%w]", ctx.Err())
 	}
 
 	var pc *conn
@@ -244,13 +245,13 @@ func (p *Pool) _conn(ctx context.Context, useFreeConn bool) (*conn, error) {
 				}
 			default:
 			}
-			return nil, errors.Wrap(ctx.Err(), "Deadline of connRequests exceeded")
+			return nil, fmt.Errorf("Deadline of connRequests exceeded: [%w]", ctx.Err())
 		case ret, ok := <-req:
 			if !ok {
 				return nil, ErrGraphDBClosed
 			}
 			if ret.err != nil {
-				return ret.conn, errors.Wrap(ret.err, "Response has an error")
+				return ret.conn, fmt.Errorf("Response has an error [%w]", ret.err)
 			}
 			return ret.conn, nil
 		}
@@ -260,7 +261,7 @@ func (p *Pool) _conn(ctx context.Context, useFreeConn bool) (*conn, error) {
 	p.mu.Unlock()
 	newCn, err := p.dial()
 	if err != nil {
-		return nil, p.subtractOpen(so{tryOpening: true}, errors.Wrap(err, "Failed newConn"))
+		return nil, p.subtractOpen(so{tryOpening: true}, fmt.Errorf("Failed newConn [%w]", err))
 	}
 	return &conn{
 		Pool:   p,
@@ -340,7 +341,7 @@ func (p *Pool) Execute(query string, bindings, rebindings map[string]string) (re
 func (p *Pool) ExecuteCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	pc, err := p.conn()
 	if err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer func() {
 		p.putConn(pc, err)
@@ -353,7 +354,7 @@ func (p *Pool) ExecuteCtx(ctx context.Context, query string, bindings, rebinding
 func (p *Pool) ExecuteFile(path string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	pc, err := p.conn()
 	if err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer func() {
 		p.putConn(pc, err)
@@ -375,7 +376,7 @@ func (p *Pool) AddV(label string, i interface{}, bindings, rebindings map[string
 func (p *Pool) AddVertexCtx(ctx context.Context, label string, i interface{}, bindings, rebindings map[string]string) (resp graphson.Vertex, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.AddVertexCtx(ctx, label, i, bindings, rebindings)
@@ -385,7 +386,7 @@ func (p *Pool) AddVertexCtx(ctx context.Context, label string, i interface{}, bi
 func (p *Pool) Get(query string, bindings, rebindings map[string]string) (resp []graphson.Vertex, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.Get(query, bindings, rebindings)
@@ -395,7 +396,7 @@ func (p *Pool) Get(query string, bindings, rebindings map[string]string) (resp [
 func (p *Pool) GetCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []graphson.Vertex, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
-		return resp, errors.Wrap(err, "GetCtx: Failed p.connCtx")
+		return resp, fmt.Errorf("GetCtx: Failed p.connCtx [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.GetCtx(ctx, query, bindings, rebindings)
@@ -405,7 +406,7 @@ func (p *Pool) GetCtx(ctx context.Context, query string, bindings, rebindings ma
 func (p *Pool) OpenStreamCursor(ctx context.Context, query string, bindings, rebindings map[string]string) (stream *Stream, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
-		err = errors.Wrap(err, "OpenStreamCursor: Failed p.connCtx")
+		err = fmt.Errorf("OpenStreamCursor: Failed p.connCtx [%w]", err)
 		return
 	}
 	defer p.putConn(pc, err)
@@ -416,7 +417,7 @@ func (p *Pool) OpenStreamCursor(ctx context.Context, query string, bindings, reb
 func (p *Pool) OpenCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor *Cursor, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
-		err = errors.Wrap(err, "GetCursorCtx: Failed p.connCtx")
+		err = fmt.Errorf("GetCursorCtx: Failed p.connCtx [%w]", err)
 		return
 	}
 	defer p.putConn(pc, err)
@@ -429,7 +430,7 @@ func (p *Pool) OpenCursorCtx(ctx context.Context, query string, bindings, rebind
 func (p *Pool) ReadCursorCtx(ctx context.Context, cursor *Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
-		err = errors.Wrap(err, "NextCtx: Failed p.connCtx")
+		err = fmt.Errorf("NextCtx: Failed p.connCtx [%w]", err)
 		return
 	}
 	defer p.putConn(pc, err)
@@ -445,7 +446,7 @@ func (p *Pool) AddEdgeCtx(ctx context.Context, label, fromId, toId string, props
 	// AddEdgeCtx
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.AddEdgeCtx(ctx, label, fromId, toId, props)
@@ -459,7 +460,7 @@ func (p *Pool) GetE(q string, bindings, rebindings map[string]string) (resp inte
 func (p *Pool) GetEdgeCtx(ctx context.Context, q string, bindings, rebindings map[string]string) (resp interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		return resp, errors.Wrap(err, "Failed p.conn")
+		return resp, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.GetEdgeCtx(ctx, q, bindings, rebindings)
@@ -471,7 +472,7 @@ func (p *Pool) GetCount(q string, bindings, rebindings map[string]string) (i int
 func (p *Pool) GetCountCtx(ctx context.Context, q string, bindings, rebindings map[string]string) (i int64, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		return 0, errors.Wrap(err, "Failed p.conn")
+		return 0, fmt.Errorf("Failed p.conn [%w]", err)
 	}
 	defer p.putConn(pc, err)
 	return pc.Client.GetCountCtx(ctx, q, bindings, rebindings)
@@ -483,7 +484,7 @@ func (p *Pool) GetStringList(q string, bindings, rebindings map[string]string) (
 func (p *Pool) GetStringListCtx(ctx context.Context, q string, bindings, rebindings map[string]string) (vals []string, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		err = errors.Wrap(err, "GetStringListCtx: Failed p.conn")
+		err = fmt.Errorf("GetStringListCtx: Failed p.conn [%w]", err)
 		return
 	}
 	defer p.putConn(pc, err)
@@ -497,7 +498,7 @@ func (p *Pool) GetProperties(q string, bindings, rebindings map[string]string) (
 func (p *Pool) GetPropertiesCtx(ctx context.Context, q string, bindings, rebindings map[string]string) (vals map[string][]interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		err = errors.Wrap(err, "GetPropertiesCtx: Failed p.conn")
+		err = fmt.Errorf("GetPropertiesCtx: Failed p.conn [%w]", err)
 		return
 	}
 	defer p.putConn(pc, err)

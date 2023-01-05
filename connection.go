@@ -2,12 +2,12 @@ package gremgo
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 )
 
 //go:generate moq -out dialer_moq_test.go . dialer
@@ -217,14 +217,14 @@ func (c *Client) readWorker(errs chan error, quit chan struct{}) { // readWorker
 			return
 		}
 		if err != nil {
-			errs <- errors.Wrapf(err, "Receive message type: %d", msgType)
+			errs <- fmt.Errorf("Receive message type: %d [%w]", msgType, err)
 			c.Errored = true
 			break
 		}
 		if msg != nil {
 			if err = c.handleResponse(msg); err != nil {
 				// XXX this makes the err fatal
-				errs <- errors.Wrapf(err, "handleResponse fail: %q", msg)
+				errs <- fmt.Errorf("handleResponse fail: %q [%w]", msg, err)
 				c.Errored = true
 			}
 		}
@@ -258,7 +258,7 @@ func (c *Client) readWorkerCtx(ctx context.Context, msgs chan []byte, errs chan 
 				return
 			}
 			if msg.err != nil {
-				errs <- errors.Wrapf(msg.err, "Receive message type: %d", msg.mType)
+				errs <- fmt.Errorf("Receive message type: %d [%w]", msg.mType, msg.err)
 				c.Errored = true
 				return
 			}

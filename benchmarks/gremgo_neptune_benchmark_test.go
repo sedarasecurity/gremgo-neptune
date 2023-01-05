@@ -3,7 +3,7 @@ package gremgo_test
 import (
 	"testing"
 
-	. "github.com/ONSdigital/gremgo-neptune"
+	. "github.com/sedarasecurity/gremgo-neptune"
 )
 
 func init() {

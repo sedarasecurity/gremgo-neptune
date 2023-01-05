@@ -2,11 +2,12 @@ package gremgo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/ONSdigital/graphson"
-	"github.com/pkg/errors"
 )
 
 //go:generate moq -out retriever_moq_test.go . Retriever
@@ -62,7 +63,7 @@ func (s *Stream) refillBuffer() error {
 	for responses == nil && !s.eof { //responses could be empty if reading too quickly
 
 		if responses, s.eof, err = s.client.retrieveNextResponseCtx(context.Background(), s.cursor); err != nil {
-			return errors.Wrapf(err, "stream.refillBuffer: %s", s.cursor.ID)
+			return fmt.Errorf("stream.refillBuffer: %s [%w]", s.cursor.ID, err)
 		}
 
 		//gremlin has returned a validly formed 'no content' response

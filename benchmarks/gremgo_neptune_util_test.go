@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/ONSdigital/gremgo-neptune"
+	. "github.com/sedarasecurity/gremgo-neptune"
 )
 
 var g *Client

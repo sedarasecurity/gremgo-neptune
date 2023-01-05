@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	gremgo "github.com/ONSdigital/gremgo-neptune"
+	gremgo "github.com/sedarasecurity/gremgo-neptune"
 )
 
 func main() {

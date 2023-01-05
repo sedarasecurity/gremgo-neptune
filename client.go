@@ -3,6 +3,7 @@ package gremgo
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ONSdigital/graphson"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -108,7 +108,7 @@ func (c *Client) executeRequestCtx(ctx context.Context, query string, bindings, 
 	c.dispatchRequestCtx(ctx, msg)
 	resp, err = c.retrieveResponseCtx(ctx, id)
 	if err != nil {
-		err = errors.Wrapf(err, "query: %s", query)
+		err = fmt.Errorf("query: %s [%w]", query, err)
 	}
 	return
 }
@@ -127,7 +127,7 @@ func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bind
 	c.responseNotifier.Store(id, make(chan error, 1))
 	c.chunkNotifier.Store(id, make(chan bool, 10))
 	if c.dispatchRequestCtx(ctx, msg); err != nil {
-		err = errors.Wrap(err, "executeRequestCursorCtx")
+		err = fmt.Errorf("executeRequestCursorCtx: [%w]", err)
 		return
 	}
 
@@ -243,12 +243,12 @@ func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebi
 func (c *Client) ReadCursorCtx(ctx context.Context, cursor *Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
-		err = errors.Wrapf(err, "ReadCursorCtx: %s", cursor.ID)
+		err = fmt.Errorf("ReadCursorCtx: %s [%w]", cursor.ID, err)
 		return
 	}
 
 	if res, err = c.deserializeResponseToVertices(resp); err != nil {
-		err = errors.Wrapf(err, "ReadCursorCtx: %s", cursor.ID)
+		err = fmt.Errorf("ReadCursorCtx: %s [%w]", cursor.ID, err)
 		return
 	}
 	return
